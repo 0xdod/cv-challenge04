@@ -14,30 +14,39 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Detect changes in services
         id: filter
-        run: >
+        run: |
           CHANGED_SERVICES=()
 
-          microservices=(adservice cartservice checkoutservice currencyservice
-          emailservice frontend loadgenerator paymentservice
-          productcatalogservice recommendationservice shippingservice
-          shoppingassistantservice)
+          microservices=(adservice cartservice checkoutservice currencyservice emailservice frontend loadgenerator paymentservice productcatalogservice recommendationservice shippingservice shoppingassistantservice)
+
+          BEFORE_SHA=${{ github.event.before }}
+          if [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BEFORE_SHA=$(git rev-parse HEAD~1)
+          fi
 
           for service in "${microservices[@]}" ; do
-            if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^$service/"; then
+            if git diff --name-only "$BEFORE_SHA" ${{ github.sha }} | grep -q "^$service/"; then
               CHANGED_SERVICES+=("\"$service\"")
             fi
           done
 
-          echo "services=[$(IFS=,; echo "${CHANGED_SERVICES[*]}")]" >>
-          $GITHUB_ENV
+          # If no changes detected, set CHANGED_SERVICES to all microservices
+          if [ ${#CHANGED_SERVICES[@]} -eq 0 ]; then
+            for service in "${microservices[@]}" ; do
+              CHANGED_SERVICES+=("\"$service\"")
+            done
+          fi
+          SERVICES_JSON="[$(IFS=,; echo "${CHANGED_SERVICES[*]}")]"
+          echo "services=${SERVICES_JSON}" >> "$GITHUB_ENV"
+          echo "services=${SERVICES_JSON}" >> "$GITHUB_OUTPUT"
 
-          echo "services=$(IFS=,; echo "${CHANGED_SERVICES[*]}")" >>
-          $GITHUB_OUTPUT
       - name: Show detected services
         run: |
           echo "Changed services: ${{ env.services }}"
+
   build-and-push:
     name: Build and push docker image to registry
     needs: detect-changes

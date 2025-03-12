@@ -71,10 +71,12 @@ jobs:
           password: "${{ secrets.DOCKER_PASSWORD }}"
       - name: Build and push Docker image
         id: push
+        env:
+          DOCKERFILE_PATH: ${{ matrix.service == 'cartservice' && 'src/Dockerfile' || 'Dockerfile' }}
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
         with:
           context: "src/${{ matrix.service }}"
-          file: 'src/${{ matrix.service }}/$([[ ${{ matrix.service }} == "cartservice" ]] && echo "src/Dockerfile" || echo "Dockerfile")'
+          file: "src/${{ matrix.service }}/$DOCKERFILE_PATH"
           push: true
           tags: "0xdod/${{ matrix.service }}:${{ github.sha }}"
       - name: Run Trivy vulnerability scanner
